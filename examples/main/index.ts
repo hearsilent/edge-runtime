@@ -24,8 +24,8 @@ serve(async (req: Request) => {
   const createWorker = async () => {
     const memoryLimitMb = 150;
     const workerTimeoutMs = 1 * 60 * 1000;
-    const noModuleCache = false;
-    const importMapPath = null;
+    const noModuleCache = true;
+    const importMapPath = "./examples/import-map/import_map.json";
     const envVarsObj = Deno.env.toObject();
     const envVars = Object.keys(envVarsObj).map(k => [k, envVarsObj[k]]);
 

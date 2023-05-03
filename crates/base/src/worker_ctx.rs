@@ -74,7 +74,7 @@ pub async fn create_worker(
             // spawn a task to poll the connection and drive the HTTP state
             tokio::task::spawn(async move {
                 if let Err(e) = connection.without_shutdown().await {
-                    error!("Error in main worker connection: {}", e);
+                    error!("Error in worker connection: {}", e);
                 }
             });
             tokio::task::yield_now().await;
