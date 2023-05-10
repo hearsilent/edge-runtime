@@ -21,6 +21,7 @@ pub async fn create_worker(
     init_opts: EdgeContextInitOpts,
 ) -> Result<mpsc::UnboundedSender<WorkerRequestMsg>, Error> {
     let service_path = init_opts.service_path.clone();
+    let service_path_clone = service_path.clone();
 
     if !service_path.exists() {
         bail!("service does not exist {:?}", &service_path)
@@ -28,6 +29,11 @@ pub async fn create_worker(
 
     let (worker_boot_result_tx, worker_boot_result_rx) = oneshot::channel::<Result<(), Error>>();
     let (unix_stream_tx, unix_stream_rx) = mpsc::unbounded_channel::<UnixStream>();
+
+    let (worker_key, pool_msg_tx) = match init_opts.conf.clone() {
+        EdgeContextOpts::UserWorker(worker_opts) => (worker_opts.key, worker_opts.pool_msg_tx),
+        EdgeContextOpts::MainWorker(_opts) => (None, None),
+    };
 
     let _handle: thread::JoinHandle<Result<(), Error>> = thread::spawn(move || {
         let runtime = tokio::runtime::Builder::new_current_thread()
@@ -58,6 +64,15 @@ pub async fn create_worker(
                 service_path,
                 result.unwrap_err()
             );
+        }
+
+        // remove the worker from pool
+        if let Some(k) = worker_key {
+            if let Some(tx) = pool_msg_tx {
+                if tx.send(UserWorkerMsgs::Shutdown(k)).is_err() {
+                    error!("failed to send the shutdown signal to user worker pool");
+                }
+            }
         }
 
         Ok(())
