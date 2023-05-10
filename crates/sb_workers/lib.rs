@@ -315,11 +315,22 @@ pub async fn op_user_worker_fetch_send(
     let uuid = Uuid::parse_str(key.as_str())?;
     tx.send(UserWorkerMsgs::SendRequest(uuid, request.0, result_tx))?;
 
-    let result = result_rx.await?;
+    println!("waiting for user worker result");
+    let result = result_rx.await;
+    println!("user worker result received {:?}", result);
+    if result.is_err() {
+        println!("user worker result error: {:?}", result);
+        return Err(custom_error(
+            "user_worker_fetch",
+            "user worker results channel closed",
+        ));
+    }
+    println!("user worker result: {:?}", result);
+    let result = result.unwrap();
     if result.is_err() {
         return Err(custom_error(
             "InvalidWorkerResponse",
-            "user worker not available",
+            result.unwrap_err().to_string(),
         ));
     }
 

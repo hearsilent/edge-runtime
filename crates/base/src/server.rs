@@ -1,5 +1,5 @@
 use crate::worker_ctx::{create_user_worker_pool, create_worker, WorkerRequestMsg};
-use anyhow::{anyhow, Error};
+use anyhow::{anyhow, bail, Error};
 use hyper::{server::conn::Http, service::Service, Body, Request, Response};
 use log::{debug, error, info};
 use sb_worker_context::essentials::{EdgeContextInitOpts, EdgeContextOpts, EdgeMainRuntimeOpts};
@@ -48,11 +48,23 @@ impl Service<Request<Body>> for WorkerService {
             let (res_tx, res_rx) = oneshot::channel::<Result<Response<Body>, hyper::Error>>();
             let msg = WorkerRequestMsg { req, res_tx };
 
-            worker_req_tx.send(msg)?;
-            let result = res_rx.await?;
-            match result {
+            if worker_req_tx.send(msg).is_err() {
+                bail!("main worker request channel is closed")
+            }
+
+            let result = res_rx.await;
+            if result.is_err() {
+                bail!("failed to get a response from main worker")
+            }
+
+            match result.unwrap() {
                 Ok(res) => Ok(res),
-                Err(e) => Err(anyhow!(e)),
+                Err(e) => {
+                    error!("received an error for request {:?}", e);
+                    //Err(anyhow!(e))
+                    // FIXME return an error status
+                    Ok(Response::new(Body::empty()))
+                }
             }
         };
 
@@ -113,6 +125,7 @@ impl Server {
                        Ok((conn, _)) => {
                            tokio::task::spawn(async move {
                              let service = WorkerService::new(main_worker_req_tx);
+                             println!("created new service");
 
                              let conn_fut = Http::new()
                                 .serve_connection(conn, service);

@@ -89,11 +89,18 @@ pub async fn create_worker(
                 // create a unix socket pair
                 let (sender_stream, recv_stream) = UnixStream::pair()?;
 
-                let _ = unix_stream_tx.clone().send(recv_stream);
+                if unix_stream_tx.clone().send(recv_stream).is_err() {
+                    error!("failed to send the recv_stream");
+                    continue;
+                };
 
                 // send the HTTP request to the worker over Unix stream
-                let (mut request_sender, connection) =
-                    hyper::client::conn::handshake(sender_stream).await?;
+                let handshake_result = hyper::client::conn::handshake(sender_stream).await;
+                if handshake_result.is_err() {
+                    error!("handshake returned an error {:?}", handshake_result);
+                    continue;
+                }
+                let (mut request_sender, connection) = handshake_result.unwrap();
 
                 // spawn a task to poll the connection and drive the HTTP state
                 tokio::task::spawn(async move {
@@ -104,8 +111,11 @@ pub async fn create_worker(
                 tokio::task::yield_now().await;
 
                 let result = request_sender.send_request(msg.req).await;
+                println!("send request result {:?} {:?}", &service_path_clone, result);
                 let _ = msg.res_tx.send(result);
             }
+
+            println!("work req handle loop ended {:?}", service_path_clone);
 
             Ok(())
         });
@@ -126,6 +136,7 @@ pub async fn create_user_worker_pool() -> Result<mpsc::UnboundedSender<UserWorke
         mpsc::unbounded_channel::<UserWorkerMsgs>();
 
     let user_worker_msgs_tx_clone = user_worker_msgs_tx.clone();
+
     let _handle: tokio::task::JoinHandle<Result<(), Error>> = tokio::spawn(async move {
         let mut user_workers: HashMap<Uuid, mpsc::UnboundedSender<WorkerRequestMsg>> =
             HashMap::new();
@@ -166,17 +177,36 @@ pub async fn create_user_worker_pool() -> Result<mpsc::UnboundedSender<UserWorke
                         let msg = WorkerRequestMsg { req, res_tx };
 
                         // send the message to worker
-                        worker.send(msg)?;
+                        if worker.send(msg).is_err() {
+                            error!("user worker receiver dropped");
+                            continue;
+                        };
 
                         // wait for the response back from the worker
-                        let res = res_rx.await??;
-
-                        // send the response back to the caller
-                        if tx.send(Ok(res)).is_err() {
-                            bail!("main worker receiver dropped")
-                        }
+                        let res = res_rx.await;
+                        if res.is_err() {
+                            error!("user worker did not respond");
+                            if tx.send(Err(anyhow!("response error"))).is_err() {
+                                error!("main worker receiver dropped");
+                            }
+                        } else {
+                            let res = res.unwrap();
+                            if res.is_err() {
+                                error!("user worker error: {:?}", res);
+                                if tx.send(Err(anyhow!("response error"))).is_err() {
+                                    error!("main worker receiver dropped");
+                                } else {
+                                    println!("sent response to main worker");
+                                }
+                            } else {
+                                // send the response back to the caller
+                                if tx.send(Ok(res.unwrap())).is_err() {
+                                    error!("main worker receiver dropped");
+                                }
+                            }
+                        };
                     } else if tx.send(Err(anyhow!("user worker not available"))).is_err() {
-                        bail!("main worker receiver dropped")
+                        error!("main worker receiver dropped");
                     };
                 }
                 Some(UserWorkerMsgs::Shutdown(key)) => {
