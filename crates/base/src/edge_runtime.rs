@@ -21,7 +21,6 @@ use std::{fmt, fs};
 use tokio::net::UnixStream;
 use tokio::sync::mpsc;
 use tokio::sync::oneshot;
-use uuid::Uuid;
 
 use crate::{errors_rt, snapshot};
 use module_loader::DefaultModuleLoader;

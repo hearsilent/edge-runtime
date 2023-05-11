@@ -10,11 +10,14 @@ impl CliLogger {
             env_logger::Env::default().default_filter_or(log_level.to_level_filter().to_string()),
         )
         .format(|buf, record| {
-            if record.level() == log::Level::Debug {
-                writeln!(buf, "{} {}", record.level(), record.args())
-            } else {
-                writeln!(buf, "{}", record.args())
-            }
+            writeln!(
+                buf,
+                "{} {} {} {}",
+                record.file().unwrap_or("unknown"),
+                record.line().unwrap_or(0),
+                record.level(),
+                record.args()
+            )
         })
         .build();
         Self { logger }

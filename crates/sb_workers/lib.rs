@@ -377,9 +377,7 @@ pub async fn op_user_worker_fetch_send(
 
 // [copied from https://github.com/denoland/deno/blob/v1.31.3/ext/fetch/byte_stream.rs]
 // [MpscByteStream] is a stream of bytes that is backed by a mpsc channel. It is
-// used to bridge between the fetch task and the HTTP body stream. The stream
-// has the special property that it errors if the channel is closed before an
-// explicit EOF is sent (in the form of a [None] value on the sender).
+// used to bridge between the fetch task and the HTTP body stream.
 pub struct MpscByteStream {
     receiver: mpsc::Receiver<Option<bytes::Bytes>>,
     shutdown: bool,
@@ -401,10 +399,14 @@ impl Stream for MpscByteStream {
 
     fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
         let val = std::task::ready!(self.receiver.poll_recv(cx));
-        //println!("{:?}", val);
+        println!("mpsc stream {:?}", val);
         match val {
             None if self.shutdown => Poll::Ready(None),
-            // handle chunked readable streams
+            // In the original Deno implementation, The stream
+            // has the special property that it errors if the channel is closed before an
+            // explicit EOF is sent (in the form of a [None] value on the sender).
+            // We don't do that - instead None will close the stream without an error.
+            // This is so it can handle chunked readable streams
             None => {
                 self.shutdown = true;
                 Poll::Ready(None)
