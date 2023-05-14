@@ -125,7 +125,6 @@ impl Server {
                        Ok((conn, _)) => {
                            tokio::task::spawn(async move {
                              let service = WorkerService::new(main_worker_req_tx);
-                             println!("created new service");
 
                              let conn_fut = Http::new()
                                 .serve_connection(conn, service);

@@ -42,6 +42,7 @@ class UserWorker {
         const { requestRid, requestBodyRid } = await ops.op_user_worker_fetch_build(userWorkerReq);
 
         // stream the request body
+        // FIXME: this crashes if worker is not available
         if (hasReqBody) {
             let writableStream = writableStreamForRid(requestBodyRid);
             body.pipeTo(writableStream);

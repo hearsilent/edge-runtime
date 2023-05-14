@@ -262,7 +262,7 @@ impl EdgeRuntime {
 
             let result: Result<EdgeCallResult, Error> = tokio::select! {
                 _ = js_runtime.run_event_loop(false) => {
-                    debug!("Event loop has completed");
+                    debug!("[{:?}] Event loop has completed", &self.main_module_url.path());
 
                     match tokio::time::timeout(std::time::Duration::from_millis(self.curr_user_opts.worker_timeout_ms), mod_result).await {
                         Err(_err) => {

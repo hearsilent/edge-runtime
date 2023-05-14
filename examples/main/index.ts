@@ -44,12 +44,15 @@ serve(async (req: Request) => {
       // check if an existing worker is available in cache
       let worker = workerCache.get(servicePath);
       if (!worker) {
+        console.log("main worker before create worker");
         worker = await createWorker();
+        console.log("main worker after create worker");
         workerCache.set(servicePath, worker);
       }
 
       return await worker.fetch(req);
     } catch (e) {
+      console.log("main worker error:")
       console.error(e);
       if (e.message === "user worker not available") {
         // remove the worker from cache

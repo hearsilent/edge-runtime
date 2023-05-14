@@ -1,7 +1,7 @@
 use crate::edge_runtime::{EdgeCallResult, EdgeRuntime};
 use anyhow::{anyhow, bail, Error};
 use hyper::{Body, Request, Response};
-use log::error;
+use log::{debug, error};
 use sb_worker_context::essentials::{
     CreateUserWorkerResult, EdgeContextInitOpts, EdgeContextOpts, UserWorkerMsgs,
 };
@@ -111,11 +111,11 @@ pub async fn create_worker(
                 tokio::task::yield_now().await;
 
                 let result = request_sender.send_request(msg.req).await;
-                println!("send request result {:?} {:?}", &service_path_clone, result);
+                debug!("send request result {:?} {:?}", &service_path_clone, result);
                 let _ = msg.res_tx.send(result);
             }
 
-            println!("work req handle loop ended {:?}", service_path_clone);
+            debug!("work req handle loop ended {:?}", service_path_clone);
 
             Ok(())
         });
@@ -196,7 +196,7 @@ pub async fn create_user_worker_pool() -> Result<mpsc::UnboundedSender<UserWorke
                                 if tx.send(Err(anyhow!("response error"))).is_err() {
                                     error!("main worker receiver dropped");
                                 } else {
-                                    println!("sent response to main worker");
+                                    debug!("sent response to main worker");
                                 }
                             } else {
                                 // send the response back to the caller

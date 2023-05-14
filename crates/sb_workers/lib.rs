@@ -399,7 +399,6 @@ impl Stream for MpscByteStream {
 
     fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
         let val = std::task::ready!(self.receiver.poll_recv(cx));
-        println!("mpsc stream {:?}", val);
         match val {
             None if self.shutdown => Poll::Ready(None),
             // In the original Deno implementation, The stream
