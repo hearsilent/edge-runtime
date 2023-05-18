@@ -4,6 +4,8 @@ console.log('main function started');
 
 serve(async (req: Request) => {
   const url = new URL(req.url);
+  console.log(url)
+  console.log(req)
   const {pathname} = url;
   const path_parts = pathname.split("/");
   const service_name = path_parts[1];
